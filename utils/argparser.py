@@ -1,6 +1,7 @@
 import collections
 import itertools
 import re
+import string
 from typing import Iterator
 
 from disnake.ext.commands import BadArgument, ExpectedClosingQuoteError
@@ -380,7 +381,7 @@ class ParsedArguments:
 
 # ==== other helpers ====
 def argquote(arg: str):
-    if " " in arg:
+    if any(char in arg for char in string.whitespace):
         arg = arg.replace('"', '\\"')  # re.sub(r'(?<!\\)"', r'\"', arg)
         arg = f'"{arg}"'
     return arg
@@ -446,7 +447,9 @@ class CustomStringView(StringView):
                 continue
 
             # opening quote
-            if not is_quoted and current in ALL_QUOTES and current != "'":  # special case: apostrophes in mid-string
+            if (
+                not is_quoted and current in ALL_QUOTES and current != "'" and current != "’"
+            ):  # special case: apostrophes in mid-string
                 close_quote = QUOTE_PAIRS.get(current)
                 is_quoted = True
                 _escaped_quotes = (current, close_quote)

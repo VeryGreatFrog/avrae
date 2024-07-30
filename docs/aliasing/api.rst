@@ -250,12 +250,14 @@ Python Builtins
     :return: The smallest integer >= x.
     :rtype: int
 
-.. function:: enumerate(x)
+.. function:: enumerate(x[, start=0)
 
     Returns a iterable of tuples containing a count and the values from the iterable.
 
     :param x: The value to convert.
     :type x: iterable
+    :param start: The starting value for the count
+    :type start: int
     :return: enumerate of count and objects.
     :rtype: iterable[tuple[int, any]]
 
@@ -452,11 +454,11 @@ Draconic Functions
 
 .. autofunction:: aliasing.evaluators.ScriptingEvaluator.get_gvar(address)
 
-.. autofunction:: aliasing.evaluators.ScriptingEvaluator.get_svar(name)
+.. autofunction:: aliasing.evaluators.ScriptingEvaluator.get_svar(name[, default=None])
 
 .. autofunction:: aliasing.evaluators.ScriptingEvaluator.get_uvars()
 
-.. autofunction:: aliasing.evaluators.ScriptingEvaluator.get_uvar()
+.. autofunction:: aliasing.evaluators.ScriptingEvaluator.get_uvar(name[, default=None])
 
 .. function:: randint(stop)
               randint(start, stop[, step])
@@ -497,9 +499,9 @@ Draconic Functions
     :param population: The itterable to choose random items from.
     :type population: iterable.
     :param weights: The odds for each item in the ``population`` iterable.
-    :type weights: list of ints
+    :type weights: list of integers, floats, and fractions but not decimals
     :param cum_weights: The cumulative odds for each item in the ``population`` itterable.
-    :type cum_weights: list of ints
+    :type cum_weights: list of integers, floats, and fractions but not decimals
     :param k: The length of the output.
     :type k: int
     :return: A list of random items from the iterable.

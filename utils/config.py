@@ -1,6 +1,11 @@
 import os
 import sys
 
+# This method will load the variables from .env into the environment for running in local
+# from dotenv import load_dotenv
+# load_dotenv()
+
+
 # ==== bot config constants / env vars ====
 TOKEN = os.environ.get("DISCORD_BOT_TOKEN", "")
 TESTING = bool(os.environ.get("TESTING")) or "test" in sys.argv
@@ -64,7 +69,7 @@ DDB_GAMELOG_ENDPOINT = os.getenv("DDB_GAMELOG_ENDPOINT", "https://game-log-rest-
 DDB_CHARACTER_SERVICE_URL = os.getenv(
     "DDB_CHARACTER_SERVICE_URL", "https://character-service.dndbeyond.com/character/v5"
 )
-DDB_SCDS_SERVICE_URL = os.getenv("DDB_SCDS_SERVICE_URL", "https://character-service-scds.dndbeyond.com/v1")
+DDB_SCDS_SERVICE_URL = os.getenv("DDB_SCDS_SERVICE_URL", "https://character-service-scds.dndbeyond.com/v2")
 DDB_MEDIA_S3_BUCKET_DOMAIN = os.getenv("DDB_MEDIA_S3_BUCKET_DOMAIN", "www.dndbeyond.com")  # used for !token
 
 # ---- launchdarkly ----

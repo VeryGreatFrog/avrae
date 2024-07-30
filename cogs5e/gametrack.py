@@ -5,6 +5,7 @@ Most of this module was coded 5 miles in the air. (Aug 8, 2017)
 
 @author: andrew
 """
+
 import collections
 import logging
 import re
@@ -283,7 +284,7 @@ class GameTrack(commands.Cog):
         await gameutils.send_hp_result(ctx, caster, delta)
 
     @game.group(name="deathsave", aliases=["ds"], invoke_without_command=True)
-    async def game_deathsave(self, ctx, *args):
+    async def game_deathsave(self, ctx, *, args=""):
         """Commands to manage character death saves.
         __Valid Arguments__
         See `!help save`."""
@@ -475,7 +476,7 @@ class GameTrack(commands.Cog):
         await ep.send_to(ctx)
 
     @spellbook.command(name="add")
-    async def spellbook_add(self, ctx, spell_name, *args):
+    async def spellbook_add(self, ctx, spell_name, *, args=""):
         """
         Adds a spell to the spellbook override.
 
@@ -533,7 +534,7 @@ class GameTrack(commands.Cog):
                 "Are you *absolutely sure* you want to continue?"
             ),
         ):
-            return await ctx.send("Unconfirmed. Aborting.")
+            return await ctx.send("Unconfirmed. Cancelling.")
 
         character.remove_all_known_spells()
 
@@ -621,7 +622,7 @@ class GameTrack(commands.Cog):
         await ctx.send(embed=result_embed)
 
     @customcounter.command(name="create")
-    async def customcounter_create(self, ctx, name, *args):
+    async def customcounter_create(self, ctx, name, *, args=""):
         """
         Creates a new custom counter.
         __Valid Arguments__
@@ -633,7 +634,7 @@ class GameTrack(commands.Cog):
         `-value <value>` - The initial value for the counter.
         `-type <bubble|square|hex|star|default>` - Whether the counter displays bubbles/squares/hexes/stars to show remaining uses or numbers. Default - numbers.
         `-resetto <value>` - The value to reset the counter to. Default - maximum.
-        `-resetby <value>` - Rather than resetting to a certain value, modify the counter by this much per reset. Supports dice.
+        `-resetby <value>` - Rather than resetting to a certain value, modify the counter by this much per reset. Supports annotated dice strings.
         """  # noqa: E501
         character: Character = await ctx.get_character()
 
@@ -642,7 +643,7 @@ class GameTrack(commands.Cog):
             if await confirm(ctx, "Warning: This will overwrite an existing consumable. Continue? (Reply with yes/no)"):
                 character.consumables.remove(conflict)
             else:
-                return await ctx.send("Overwrite unconfirmed. Aborting.")
+                return await ctx.send("Overwrite unconfirmed. Cancelling.")
 
         args = argparse(args)
         _reset = args.last("reset")
@@ -676,7 +677,7 @@ class GameTrack(commands.Cog):
             await ctx.send(f"Custom counter created.\n**{name}**\n{new_counter.full_str()}")
 
     @customcounter.command(name="edit")
-    async def customcounter_edit(self, ctx, name, *args):
+    async def customcounter_edit(self, ctx, name, *, args=""):
         """
         Edits an existing custom counter replacing passed arguments.
 
@@ -692,7 +693,7 @@ class GameTrack(commands.Cog):
         `-min <min value>` - The minimum value of the counter.
         `-type <bubble|square|hex|star|default>` - Whether the counter displays bubbles/squares/hexes/stars to show remaining uses or numbers. Default - numbers.
         `-resetto <value>` - The value to reset the counter to. Default - maximum.
-        `-resetby <value>` - Rather than resetting to a certain value, modify the counter by this much per reset. Supports dice.
+        `-resetby <value>` - Rather than resetting to a certain value, modify the counter by this much per reset. Supports annotated dice strings.
         """  # noqa: E501
         character: Character = await ctx.get_character()
         counter = await character.select_consumable(ctx, name)

@@ -133,18 +133,15 @@ class DicecloudV2Parser(SheetLoaderABC):
         race = None
         subrace = None
         background = None
-        filled = 0
         for prop in self._by_type["folder"] + self._by_type["feature"] + self._by_type["note"]:
-            if race is None and "race" in prop["tags"]:
-                race = prop["name"]
-                filled += 1
-            elif subrace is None and "subrace" in prop["tags"]:
-                subrace = prop["name"]
-                filled += 1
-            elif background is None and "background" in prop["tags"]:
-                background = prop["name"]
-                filled += 1
-            if filled == 3:
+            tags = prop["tags"] + prop.get("libraryTags", [])
+            if race is None and "race" in tags:
+                race = prop.get("name")
+            elif subrace is None and "subrace" in tags:
+                subrace = prop.get("name")
+            elif background is None and "background" in tags:
+                background = prop.get("name")
+            if race is not None and subrace is not None and background is not None:
                 break
 
         # defaults if any were still None
@@ -204,7 +201,7 @@ class DicecloudV2Parser(SheetLoaderABC):
 
         # keep track of which properties' parents weren't registered by the time we reach them
         orphans = collections.defaultdict(lambda: [])  # :'(
-        for prop in self.character_data["creatureProperties"]:
+        for prop in self.character_data.get("creatureProperties", []):
             # if a property is marked for removal, skip it
             if prop.get("removed"):
                 continue
@@ -349,16 +346,14 @@ class DicecloudV2Parser(SheetLoaderABC):
 
             # 7 was too small so 10 instead
             display_type = "bubble" if uses < 10 else None
-            consumables.append(
-                {
-                    "name": name,
-                    "value": int(attr.get("value", uses)),
-                    "minv": "0",
-                    "maxv": str(uses),
-                    "reset": RESET_MAP.get(attr.get("reset")),
-                    "display_type": display_type,
-                }
-            )
+            consumables.append({
+                "name": name,
+                "value": int(attr.get("value", uses)),
+                "minv": "0",
+                "maxv": str(uses),
+                "reset": RESET_MAP.get(attr.get("reset")),
+                "display_type": display_type,
+            })
 
     def get_levels(self) -> Levels:
         """Returns a dict with the character's level and class levels."""
@@ -369,7 +364,7 @@ class DicecloudV2Parser(SheetLoaderABC):
 
         # setup a default dict for collecting class levels
         levels = collections.defaultdict(lambda: 0)
-        for level in [Class for Class in self._by_type["class"]]:
+        for level in self._by_type["class"]:
             try:
                 var_name = level["variableName"]
                 # BloodHunter rather than bloodHunter
@@ -378,7 +373,12 @@ class DicecloudV2Parser(SheetLoaderABC):
             except KeyError as e:
                 raise ExternalImportError(f"Class {level.get('name', 'Unnamed')} is missing key {e.args[0]}")
 
-        level_obj = Levels(levels)
+        try:
+            total_level = self.character_data["creatureVariables"][0]["level"]["value"]
+        except (IndexError, KeyError):
+            total_level = None
+
+        level_obj = Levels(levels, total_level)
         self.levels = level_obj
         return level_obj
 
@@ -419,7 +419,7 @@ class DicecloudV2Parser(SheetLoaderABC):
         actions = []
         consumables = []
         for attack in self._by_type["action"]:
-            tags = attack["tags"]
+            tags = attack["tags"] + attack.get("libraryTags", [])
             # we don't want to parse inactive actions
             if not attack.get("inactive") and "avrae:no_import" not in tags:
                 try:
@@ -432,16 +432,14 @@ class DicecloudV2Parser(SheetLoaderABC):
                 if attack.get("uses"):
                     uses = attack["uses"]["value"]
                     display_type = "bubble" if uses < 10 else None
-                    consumables.append(
-                        {
-                            "name": aname,
-                            "value": attack.get("usesLeft", uses),
-                            "minv": "0",
-                            "maxv": str(uses),
-                            "reset": RESET_MAP.get(attack.get("reset")),
-                            "display_type": display_type,
-                        }
-                    )
+                    consumables.append({
+                        "name": aname,
+                        "value": attack.get("usesLeft", uses),
+                        "minv": "0",
+                        "maxv": str(uses),
+                        "reset": RESET_MAP.get(attack.get("reset")),
+                        "display_type": display_type,
+                    })
 
                 consumables += self._consumables_from_resources(attack["resources"])
 
@@ -514,6 +512,10 @@ class DicecloudV2Parser(SheetLoaderABC):
                 # each resistance property can give multiple resistances
                 for dmg_type in dmg_mult["damageTypes"]:
                     if dmg_type in DAMAGE_TYPES:
+                        for exclude in dmg_mult.get("excludeTags", []):
+                            dmg_type = f"non{exclude} {dmg_type}"
+                        for include in dmg_mult.get("includeTags", []):
+                            dmg_type = f"{include} {dmg_type}"
                         # if we're immune, nothing else matters
                         if dmg_type in out["immune"]:
                             continue
@@ -533,7 +535,7 @@ class DicecloudV2Parser(SheetLoaderABC):
     def get_actions(self):
         actions = []
         for f in self._by_type["feature"]:
-            if not f.get("inactive") and "avrae:no_import" not in f["tags"]:
+            if not f.get("inactive") and "avrae:no_import" not in f["tags"] + f.get("libraryTags", []):
                 actions += self.persist_actions_for_name(f.get("name"))
 
         return actions
@@ -571,86 +573,89 @@ class DicecloudV2Parser(SheetLoaderABC):
         actions = []
 
         for spell in self._by_type["spell"]:
-            if "avrae:no_import" in spell["tags"]:
+            if "avrae:no_import" in spell["tags"] + spell.get("libraryTags", []):
                 continue
+
+            # an unnamed spell is not parsable
+            if "name" not in spell:
+                continue
+
             # unprepared spells are inactive, so we need to specifically check how it is deactivated
-            if not (spell.get("deactivatedByAncestor") or spell.get("deactivatedByToggle")):
-                spell_actions = self.persist_actions_for_name(spell["name"])
-                actions += spell_actions
-                log.debug(
-                    f"Got spell with ancestors: {[spell['parent']['id']] + [k['id'] for k in spell['ancestors']]}"
-                )
+            if spell.get("deactivatedByAncestor") or spell.get("deactivatedByToggle"):
+                continue
 
-                # find the matching spell list, trying the direct parent first, then ancestors
-                sl_name, spell_ab, spell_dc, spell_mod = spell_lists.get(spell["parent"]["id"]) or next(
-                    (
-                        spell_lists[k["id"]]
-                        for k in spell["ancestors"]
-                        if k["collection"] == "creatureProperties" and k["id"] in spell_lists
-                    ),
-                    (None, None, None, None),
-                )
-                spell["spellListName"] = sl_name
+            spell_actions = self.persist_actions_for_name(spell["name"])
+            actions += spell_actions
+            log.debug(f"Got spell with ancestors: {[spell['parent']['id']] + [k['id'] for k in spell['ancestors']]}")
 
-                # we need to keep track of consumables per spell so we know if a free use action is needed
-                spell_consumables = []
+            # find the matching spell list, trying the direct parent first, then ancestors
+            sl_name, spell_ab, spell_dc, spell_mod = spell_lists.get(spell["parent"]["id"]) or next(
+                (
+                    spell_lists[k["id"]]
+                    for k in spell["ancestors"]
+                    if k["collection"] == "creatureProperties" and k["id"] in spell_lists
+                ),
+                (None, None, None, None),
+            )
+            spell["spellListName"] = sl_name
 
-                if "uses" in spell:
-                    uses = spell["uses"]["value"]
-                    display_type = "bubble" if uses < 10 else None
-                    action_name = f"{sl_name}: {spell['name']}" if sl_name else spell["name"]
-                    spell_consumables.append(
-                        {
-                            "name": action_name,
-                            "value": spell.get("usesLeft", 0),
-                            "minv": "0",
-                            "maxv": str(uses),
-                            "reset": RESET_MAP.get(spell.get("reset")),
-                            "display_type": display_type,
-                        }
+            # we need to keep track of consumables per spell so we know if a free use action is needed
+            spell_consumables = []
+
+            if "uses" in spell:
+                uses = spell["uses"]["value"]
+                display_type = "bubble" if uses < 10 else None
+                action_name = f"{sl_name}: {spell['name']}" if sl_name else spell["name"]
+                spell_consumables.append({
+                    "name": action_name,
+                    "value": spell.get("usesLeft", 0),
+                    "minv": "0",
+                    "maxv": str(uses),
+                    "reset": RESET_MAP.get(spell.get("reset")),
+                    "display_type": display_type,
+                })
+
+            spell_consumables += self._consumables_from_resources(spell["resources"])
+            consumables += spell_consumables
+
+            # shouldn't parse or add to spells if a compendium action was found
+            if not spell_actions:
+                if spell_consumables:
+                    atk = self.parse_attack(spell)
+
+                    # unique naming
+                    atk_num = 2
+                    if atk.name in self.atk_names:
+                        while f"{atk.name} {atk_num}" in self.atk_names:
+                            atk_num += 1
+                        atk.name = f"{atk.name} {atk_num}"
+                    self.atk_names.add(atk.name)
+
+                    attacks.append(atk)
+
+                # we only want to track the spell's stats if it's actually prepared
+                spell_prepared = spell.get("prepared") or spell.get("alwaysPrepared") or "noprep" in self.args
+                if spell_prepared:
+                    if spell_ab is not None:
+                        sabs.append(spell_ab)
+                    if spell_dc is not None:
+                        dcs.append(spell_dc)
+                    if spell_mod is not None:
+                        mods.append(spell_mod)
+
+                result, strict = search(compendium.spells, spell["name"].strip(), lambda sp: sp.name, strict=True)
+                if result and strict:
+                    spells.append(
+                        SpellbookSpell.from_spell(
+                            result, sab=spell_ab, dc=spell_dc, mod=spell_mod, prepared=spell_prepared
+                        )
                     )
-
-                spell_consumables += self._consumables_from_resources(spell["resources"])
-                consumables += spell_consumables
-
-                # shouldn't parse or add to spells if a compendium action was found
-                if not spell_actions:
-                    if spell_consumables:
-                        atk = self.parse_attack(spell)
-
-                        # unique naming
-                        atk_num = 2
-                        if atk.name in self.atk_names:
-                            while f"{atk.name} {atk_num}" in self.atk_names:
-                                atk_num += 1
-                            atk.name = f"{atk.name} {atk_num}"
-                        self.atk_names.add(atk.name)
-
-                        attacks.append(atk)
-
-                    # we only want to track the spell's stats if it's actually prepared
-                    spell_prepared = spell.get("prepared") or spell.get("alwaysPrepared") or "noprep" in self.args
-                    if spell_prepared:
-                        if spell_ab is not None:
-                            sabs.append(spell_ab)
-                        if spell_dc is not None:
-                            dcs.append(spell_dc)
-                        if spell_mod is not None:
-                            mods.append(spell_mod)
-
-                    result, strict = search(compendium.spells, spell["name"].strip(), lambda sp: sp.name, strict=True)
-                    if result and strict:
-                        spells.append(
-                            SpellbookSpell.from_spell(
-                                result, sab=spell_ab, dc=spell_dc, mod=spell_mod, prepared=spell_prepared
-                            )
+                else:
+                    spells.append(
+                        SpellbookSpell(
+                            spell["name"].strip(), sab=spell_ab, dc=spell_dc, mod=spell_mod, prepared=spell_prepared
                         )
-                    else:
-                        spells.append(
-                            SpellbookSpell(
-                                spell["name"].strip(), sab=spell_ab, dc=spell_dc, mod=spell_mod, prepared=spell_prepared
-                            )
-                        )
+                    )
 
         # most common stats are used for the spellbook
         dc = max(dcs, key=dcs.count, default=None)
@@ -747,16 +752,14 @@ class DicecloudV2Parser(SheetLoaderABC):
                 self._seen_consumables.add(full_attr["_id"])
                 uses = full_attr["total"]
                 display_type = "bubble" if uses < 10 else None
-                consumables.append(
-                    {
-                        "name": full_attr["name"],
-                        "value": full_attr.get("value", uses),
-                        "minv": "0",
-                        "maxv": str(uses),
-                        "reset": RESET_MAP.get(full_attr.get("reset")),
-                        "display_type": display_type,
-                    }
-                )
+                consumables.append({
+                    "name": full_attr["name"],
+                    "value": full_attr.get("value", uses),
+                    "minv": "0",
+                    "maxv": str(uses),
+                    "reset": RESET_MAP.get(full_attr.get("reset")),
+                    "display_type": display_type,
+                })
         return consumables
 
 

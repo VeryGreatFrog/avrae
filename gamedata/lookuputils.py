@@ -3,6 +3,7 @@ Created on Jan 13, 2017
 
 @author: andrew
 """
+
 import itertools
 import logging
 from typing import Dict, List, TYPE_CHECKING, TypeVar, Callable
@@ -238,7 +239,7 @@ async def add_training_data(mdb, lookup_type, query, result_name, metadata=None,
 
 
 def slash_match_key(entity):
-    return f"{entity.name} {entity.source} {'homebrew' if entity.homebrew else ''}"
+    return f"{entity.name} ({'🍺 - ' if entity.homebrew else ''}{entity.source})"
 
 
 def lookup_converter(entity_type: str) -> Callable:

@@ -40,6 +40,7 @@ All Automation runs provide the following variables:
   targeted by this automation (i.e. the ``-t`` argument).
 - ``spell_attack_bonus`` (:class:`int` or None) - The attack bonus for the spell, or the caster's default attack bonus.
 - ``spell_dc`` (:class:`int` or None) - The DC for the spell, or the caster's default DC.
+- ``spell_level`` (:class:`int` or None) - The level used to cast the spell, or None
 - ``choice`` (:class:`str`) - The input provided by the ``-choice`` argument, always lowercase. If the arg was not used, it will be an empty string.
 
 Additionally, runs triggered by an initiative effect (such as automation provided in a :ref:`ButtonInteraction`) provide
@@ -86,10 +87,6 @@ It designates what creatures to affect.
 
         - ``hp_asc``: Sorts the targets in order of remaining hit points ascending (lowest HP first, None last).
         - ``hp_desc``: Sorts the targets in order of remaining hit points descending (highest HP first, None last).
-
-    .. attribute:: self_target
-
-        *optional* - If ``true``, the effect will be added to the caster of the automation as opposed to the target.
 
 **Variables**
 
@@ -824,7 +821,7 @@ Run certain effects if a certain condition is met, or other effects otherwise. A
 
     .. attribute:: errorBehaviour
 
-        How to behave if the condition raises an error:
+        *optional* - How to behave if the condition raises an error:
 
         - ``"true"``: Run the ``onTrue`` effects.
         - ``"false"``: Run the ``onFalse`` effects. (*default*)

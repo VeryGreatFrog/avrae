@@ -3,6 +3,7 @@ Created on Jan 30, 2017
 
 @author: andrew
 """
+
 import asyncio
 import io
 import re
@@ -365,7 +366,7 @@ class CollectableManagementGroup(commands.Group):
             ),
         )
         if not response:
-            return await ctx.send("Ok, aborting.")
+            return await ctx.send("Ok, cancelling.")
 
         # execute the pending changes
         await asyncio.gather(*to_do)
@@ -436,7 +437,7 @@ class CollectableManagementGroup(commands.Group):
                 ),
             )
             if not response:
-                return await ctx.send("Ok, aborting.")
+                return await ctx.send("Ok, cancelling.")
             await collection.set_server_active(ctx)  # this loads the aliases/snippets
 
             embed = EmbedWithAuthor(ctx)

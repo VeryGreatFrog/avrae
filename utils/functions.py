@@ -3,6 +3,7 @@ Created on Oct 29, 2016
 
 @author: andrew
 """
+
 import asyncio
 import logging
 import random
@@ -74,7 +75,7 @@ def search(
         if len(partial_matches) > 1 or not partial_matches:
             names = [key(d).lower() for d in list_to_search]
             fuzzy_map = {key(d).lower(): d for d in list_to_search}
-            fuzzy_results = [r for r in process.extract(value.lower(), names, scorer=fuzz.ratio) if r[1] >= cutoff]
+            fuzzy_results = [r for r in process.extract(value.lower(), names, scorer=fuzz.WRatio) if r[1] >= cutoff]
             fuzzy_sum = sum(r[1] for r in fuzzy_results)
             fuzzy_matches_and_confidences = [(fuzzy_map[r[0]], r[1] / fuzzy_sum) for r in fuzzy_results]
 
@@ -89,6 +90,17 @@ def search(
             for r in sorted_weighted:
                 if r[0] not in results:
                     results.append(r[0])
+
+            # print out the results
+            ratio_results = {}
+            for result in results:
+                ratio_results[key(result)] = fuzz.token_set_ratio(value.lower(), key(result).lower())
+
+            # Sort
+            sorted_results = sorted(results, key=lambda e: ratio_results[key(e)], reverse=True)
+            results = sorted_results
+            print(results)
+
         else:
             results = partial_matches
     else:
@@ -117,6 +129,7 @@ async def get_selection(
     pm=False,
     message=None,
     force_select=False,
+    query=None,
 ):
     """Returns the selected choice, or raises an error.
     If delete is True, will delete the selection message and the response.
@@ -148,7 +161,8 @@ async def get_selection(
         names = [key(o) for o in _choices]
         embed = disnake.Embed()
         embed.title = "Multiple Matches Found"
-        select_str = "Which one were you looking for? (Type the number or `c` to cancel)\n"
+        select_str = f"Your input was: `{query}`\n" if query else ""
+        select_str += "Which one were you looking for? (Type the number or `c` to cancel)\n"
         if len(pages) > 1:
             select_str += "`n` to go to the next page, or `p` for previous\n"
             embed.set_footer(text=f"Page {page + 1}/{len(pages)}")
@@ -258,7 +272,9 @@ async def search_and_select(
         if len(results) == 1 and confidence > 75:
             result = first_result
         else:
-            result = await selector(ctx, results, key=selectkey or key, pm=pm, message=message, force_select=True)
+            result = await selector(
+                ctx, results, key=selectkey or key, pm=pm, message=message, force_select=True, query=query
+            )
     if not return_metadata:
         return result
     metadata = {"num_options": 1 if strict else len(results), "chosen_index": 0 if strict else results.index(result)}
@@ -379,6 +395,24 @@ def smart_trim(text, max_len=1024, dots="[...]"):
     if len(chunks) > 1:
         return f"{chunks[0]}{dots}"
     return out
+
+
+def ordinal(number: int) -> str:
+    """
+    Converts an integer into its ordinal counterpart (eg. 1 -> 1st, 2 -> 2nd, 3 -> 3rd, etc...)
+
+    :param int number: Integer to convert
+    :return: Ordinal form of the given number
+    """
+    ORDINAL_SUFFIXES = ("st", "nd", "rd", "th")
+
+    number = int(number)
+    if number // 10 == 1:
+        return f"{number}th"
+    else:
+        # index rolls over when number increases by 10, with the number shifted 1 to the left to match the 1st with a 1
+        index = min(3, (abs(number) - 1) % 10)
+        return f"{number}{ORDINAL_SUFFIXES[index]}"
 
 
 # ==== misc helpers ====
