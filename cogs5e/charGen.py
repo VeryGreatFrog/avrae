@@ -110,8 +110,9 @@ async def roll_stats(ctx):
             return embed
     except d20.TooManyRolls:
         embed.description = (
-            "Unable to roll stat rolls that meet the current rule set.\n\n"
-            "Please examine your current randchar settings to ensure that they are achievable."
+            "Unable to roll stats that meet the current rule set.\n\n"
+            "Please examine your current `Custom Stat Roll Settings` using "
+            "`!servsettings` to ensure they are achievable."
         )
         return embed
 
@@ -121,12 +122,10 @@ async def roll_stats(ctx):
     for i, rolls in enumerate(stat_rolls, 1):
         embed.add_field(
             name=f"""Stats {f"#{i}" if len(stat_rolls)>1 else ""}""",
-            value="\n".join(
-                [
-                    (f"**{stat_names[x]}:** " if straight else f"**Stat {x+1}:** ") + str(rolls["rolls"][x])
-                    for x in range(stats)
-                ]
-            )
+            value="\n".join([
+                (f"**{stat_names[x]}:** " if straight else f"**Stat {x+1}:** ") + str(rolls["rolls"][x])
+                for x in range(stats)
+            ])
             + f"\n-----\nTotal = `{rolls['total']}`",
             inline=True,
         )

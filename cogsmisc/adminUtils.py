@@ -3,6 +3,7 @@ Created on Sep 23, 2016
 
 @author: andrew
 """
+
 import asyncio
 import copy
 import io
@@ -351,6 +352,18 @@ class AdminUtils(commands.Cog):
             return await ctx.send("ok, not killing")
         resp = await self.pscall("kill_cluster", kwargs={"cluster_id": cluster_id}, expected_replies=1)
         await self._send_replies(ctx, resp)
+
+    @admin.command(hidden=True, name="register_commands")
+    @checks.is_owner()
+    async def register_slash(self, ctx):
+        """Registers all slash commands."""
+        try:
+            self.bot._command_sync_flags.sync_commands = True
+            await self.bot._sync_application_commands()
+            await ctx.send("Registered slash commands succesfully.")
+            self.bot._command_sync_flags.sync_commands = False
+        except Exception as e:
+            await ctx.send(f"Error registering slash commands: {e}")
 
     # ---- workshop ----
     @admin.group(name="workshop", invoke_without_command=True)

@@ -15,7 +15,6 @@ from urllib.parse import urlparse
 import google.oauth2.service_account
 import gspread
 from d20 import RollSyntaxError
-from google.auth.transport.requests import Request
 from google.oauth2.service_account import Credentials
 from gspread import SpreadsheetNotFound
 from gspread.exceptions import APIError, WorksheetNotFound
@@ -313,15 +312,11 @@ class GoogleSheet(SheetLoaderABC):
     @staticmethod
     async def _refresh_google_token():
         with GoogleSheet._client_lock():
-
-            def _():
-                GoogleSheet.g_client.auth.refresh(request=Request())
-                GoogleSheet.g_client.session.headers.update(
-                    {"Authorization": "Bearer %s" % GoogleSheet.g_client.auth.token}
-                )
-
             try:
-                await asyncio.get_event_loop().run_in_executor(None, _)
+                await asyncio.get_event_loop().run_in_executor(None, GoogleSheet.g_client.http_client.login)
+                GoogleSheet._token_expiry = datetime.datetime.now() + datetime.timedelta(
+                    seconds=google.oauth2.service_account._DEFAULT_TOKEN_LIFETIME_SECS
+                )
             except:
                 GoogleSheet._client_initializing = False
                 raise
@@ -329,7 +324,7 @@ class GoogleSheet(SheetLoaderABC):
 
     @staticmethod
     def _is_expired():
-        return datetime.datetime.now() > GoogleSheet._token_expiry
+        return datetime.datetime.now() >= GoogleSheet._token_expiry
 
     # load character data
     def _gchar(self):
@@ -358,10 +353,10 @@ class GoogleSheet(SheetLoaderABC):
         owner_id = str(ctx.author.id)
         try:
             await self.get_character()
-        except (KeyError, SpreadsheetNotFound, APIError):
+        except (KeyError, SpreadsheetNotFound, APIError, PermissionError):
             raise ExternalImportError(
                 "Invalid character sheet. Make sure you've shared it with me at "
-                f"`{GoogleSheet.g_client.auth.signer_email}`, or made the sheet viewable to 'Anyone with the link'!"
+                f"`{GoogleSheet.g_client.http_client.auth.service_account_email}`, or made the sheet viewable to 'Anyone with the link'!"
             )
         except Exception:
             raise

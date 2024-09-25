@@ -101,19 +101,17 @@ class Combatant(BaseCombatant, StatBlock):
 
     def to_dict(self):
         d = super().to_dict()
-        d.update(
-            {
-                "controller_id": self.controller_id,
-                "init": self.init,
-                "private": self.is_private,
-                "index": self.index,
-                "notes": self.notes,
-                "effects": [e.to_dict() for e in self._effects],
-                "group_id": self._group_id,
-                "type": self.type.value,
-                "id": self.id,
-            }
-        )
+        d.update({
+            "controller_id": self.controller_id,
+            "init": self.init,
+            "private": self.is_private,
+            "index": self.index,
+            "notes": self.notes,
+            "effects": [e.to_dict() for e in self._effects],
+            "group_id": self._group_id,
+            "type": self.type.value,
+            "id": self.id,
+        })
         return d
 
     @property
@@ -153,15 +151,17 @@ class Combatant(BaseCombatant, StatBlock):
         """Returns a string representation of the combatant's HP."""
         out = ""
         if not self.is_private or private:
+            hp_strs = []
             if self.max_hp is not None and self.hp is not None:
-                out = f"<{self.hp}/{self.max_hp} HP>"
+                hp_strs.append(f"{self.hp}/{self.max_hp} HP")
             elif self.hp is not None:
-                out = f"<{self.hp} HP>"
-            else:
-                out = ""
+                hp_strs.append(f"{self.hp} HP")
 
             if self.temp_hp and self.temp_hp > 0:
-                out += f" (+{self.temp_hp} temp)"
+                hp_strs.append(f"{self.temp_hp} temp")
+
+            out = f"<{', '.join(hp_strs) or 'None'}>"
+
         elif self.max_hp is not None and self.max_hp > 0:
             ratio = self.hp / self.max_hp
             if ratio >= 1:

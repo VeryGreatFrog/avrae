@@ -32,13 +32,15 @@ class GameLogClient(BaseClient):
         self.ddb = bot.ddb  # type: ddb.BeyondClient
         self.rdb = bot.rdb
         self.loop = bot.loop
+        self.gl_task = None
         self._event_handlers = {}
 
     def init(self):
-        self.loop.create_task(self.main_loop())
+        self.gl_task = self.loop.create_task(self.main_loop())
 
     async def close(self):
         await self.http.close()
+        self.gl_task.cancel()
 
     # ==== campaign helpers ====
     async def create_campaign_link(self, ctx, campaign_id: str, overwrite=False):
@@ -104,16 +106,20 @@ class GameLogClient(BaseClient):
                 await asyncio.sleep(5)
                 continue
 
-            log.info("Connected to pubsub.")
-            async for msg in channel.listen():
-                try:
-                    if msg["type"] == "subscribe":
-                        continue
-                    await self._recv(msg["data"])
-                except Exception as e:
-                    log.error(str(e))
-            log.warning("Disconnected from Redis pubsub! Waiting to reconnect...")
-            await asyncio.sleep(5)
+            try:
+                log.info("Connected to pubsub.")
+                async for msg in channel.listen():
+                    try:
+                        if msg["type"] == "subscribe":
+                            continue
+                        await self._recv(msg["data"])
+                    except Exception as e:
+                        log.error(str(e))
+                log.warning("Disconnected from Redis pubsub! Waiting to reconnect...")
+                await asyncio.sleep(5)
+            except Exception as e:
+                log.exception(e)
+                continue
 
     async def _recv(self, msg):
         log.debug(f"Received message: {msg}")
@@ -178,18 +184,16 @@ class GameLogClient(BaseClient):
         Called for each event that is successfully processed. Logs the event type, ddb user, ddb campaign,
         discord user id, discord guild id, discord channel id, event id, and timestamp.
         """
-        await self.bot.mdb.analytics_gamelog_events.insert_one(
-            {
-                "event_type": gctx.event.event_type,
-                "ddb_user": gctx.event.user_id,
-                "ddb_campaign": gctx.event.game_id,
-                "discord_user": gctx.discord_user_id,
-                "guild_id": gctx.guild.id,
-                "channel_id": gctx.channel.id,
-                "event_id": gctx.event.id,
-                "timestamp": datetime.datetime.now(),
-            }
-        )
+        await self.bot.mdb.analytics_gamelog_events.insert_one({
+            "event_type": gctx.event.event_type,
+            "ddb_user": gctx.event.user_id,
+            "ddb_campaign": gctx.event.game_id,
+            "discord_user": gctx.discord_user_id,
+            "guild_id": gctx.guild.id,
+            "channel_id": gctx.channel.id,
+            "event_id": gctx.event.id,
+            "timestamp": datetime.datetime.now(),
+        })
 
     # ==== game log callback registration ====
     def register_callback(self, event_type, handler):

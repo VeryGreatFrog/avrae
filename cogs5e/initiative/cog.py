@@ -27,6 +27,7 @@ from utils.functions import (
     search_and_select,
     try_delete,
     camel_to_title,
+    ordinal,
 )
 from . import (
     Combat,
@@ -102,13 +103,13 @@ class InitTracker(commands.Cog):
                 log.exception("Failed to handle init effect button click interaction:")
 
     # ==== commands ====
-    @commands.group(aliases=["i"], invoke_without_command=True)
+    @commands.group(aliases=["i", "I"], invoke_without_command=True)
     async def init(self, ctx):
         """Commands to help track initiative."""
         await ctx.send(f"Incorrect usage. Use {ctx.prefix}help init for help.")
 
     @init.command()
-    async def begin(self, ctx, *args):
+    async def begin(self, ctx, *, args=""):
         """
         Begins combat in the channel the command is invoked in.
         __Valid Arguments__
@@ -165,7 +166,7 @@ class InitTracker(commands.Cog):
         await ctx.send(out)
 
     @init.command()
-    async def add(self, ctx, modifier: int, name: str, *args):
+    async def add(self, ctx, modifier: int, name: str, *, args=""):
         """
         Adds a generic combatant to the initiative order.
 
@@ -234,7 +235,7 @@ class InitTracker(commands.Cog):
         await combat.final(ctx)
 
     @init.command()
-    async def madd(self, ctx, monster_name: str, *args):
+    async def madd(self, ctx, monster_name: str, *, args=""):
         """Adds a monster to combat.
         __Valid Arguments__
         `-name <name>` - Sets the combatant's name. Use "#" for auto-numbering, e.g. "Orc#"
@@ -510,9 +511,10 @@ class InitTracker(commands.Cog):
         combat = await ctx.get_combat()
 
         to_remove = []
-        for co in combat.get_combatants():
-            if isinstance(co, MonsterCombatant) and co.hp <= 0 and co is not combat.current_combatant:
-                to_remove.append(co)
+        if combat.options.deathdelete:
+            for co in combat.get_combatants():
+                if isinstance(co, MonsterCombatant) and co.hp <= 0 and co is not combat.current_combatant:
+                    to_remove.append(co)
 
         messages = combat.skip_rounds(numrounds)
 
@@ -525,7 +527,7 @@ class InitTracker(commands.Cog):
         await combat.final(ctx)
 
     @init.command(name="reroll", aliases=["shuffle"])
-    async def reroll(self, ctx, *args):
+    async def reroll(self, ctx, *, args=""):
         """
         Rerolls initiative for all combatants, and starts a new round of combat.
         __Valid Arguments__
@@ -561,7 +563,7 @@ class InitTracker(commands.Cog):
         await combat.final(ctx)
 
     @init.command(name="meta", aliases=["metaset"])
-    async def metasetting(self, ctx, *settings):
+    async def metasetting(self, ctx, *, settings=""):
         """
         Changes the settings of the active combat.
         __Valid Settings__
@@ -648,7 +650,7 @@ class InitTracker(commands.Cog):
         await combat.final(ctx)
 
     @init.command(aliases=["opts"])
-    async def opt(self, ctx, name: str, *args):
+    async def opt(self, ctx, name: str, *, args=""):
         """
         Edits the options of a combatant.
         __Valid Arguments__
@@ -956,7 +958,7 @@ class InitTracker(commands.Cog):
         await gameutils.send_hp_result(ctx, combatant, delta)
 
     @init.command()
-    async def effect(self, ctx, target_name: str, effect_name: str, *args):
+    async def effect(self, ctx, target_name: str, effect_name: str, *, args=""):
         """
         Attaches a status effect to a combatant.
         [args] is a set of args that affects a combatant in combat.
@@ -996,7 +998,12 @@ class InitTracker(commands.Cog):
         targets = []
 
         for i, t in enumerate([target_name] + args.get("t")):
-            target = await combat.select_combatant(ctx, t, f"Select target #{i + 1}.", select_group=True)
+            target = await combat.select_combatant(
+                ctx,
+                t,
+                f"Pick your {ordinal(i+1)} target.",
+                select_group=True,
+            )
             if isinstance(target, CombatantGroup):
                 targets.extend(target.get_combatants())
             else:
@@ -1102,7 +1109,7 @@ class InitTracker(commands.Cog):
         Rolls an attack against another combatant.
         __**Valid Arguments**__
         {VALID_AUTOMATION_ARGS}
-        custom - Makes a custom attack with 0 to hit and base damage. Use `-b` and `-d` to add to hit and damage.
+        custom - Modifier to indicate that the (arbitrarily-named) attack is custom, with custom to hit and damage values. Use `-b` and `-d` like this: `!init attack "pizza" custom -b 3 -d 1`
         """,
     )
     async def attack(self, ctx, atk_name=None, *, args=""):
@@ -1131,7 +1138,7 @@ class InitTracker(commands.Cog):
         Rolls an attack as another combatant.
         __**Valid Arguments**__
         {VALID_AUTOMATION_ARGS}
-        custom - Makes a custom attack with 0 to hit and base damage. Use `-b` and `-d` to add to hit and damage.
+        custom - Modifier to indicate that the (arbitrarily-named) attack is custom, with custom to hit and damage values. Use `-b` and `-d` like this: `!init attack "pizza" custom -b 3 -d 1`
         """,
     )
     async def aoo(self, ctx, combatant_name, atk_name=None, *, args=""):
@@ -1338,13 +1345,15 @@ class InitTracker(commands.Cog):
         if (gamelog := self.bot.get_cog("GameLog")) and isinstance(combatant, PlayerCombatant):
             await gamelog.send_save(ctx, combatant.character, result.skill_name, result.rolls)
 
-    @init.command(help=f"""
+    @init.command(
+        help=f"""
         Casts a spell against another combatant.
         __**Valid Arguments**__
         {VALID_SPELLCASTING_ARGS}
 
         {VALID_AUTOMATION_ARGS}
-        """)
+        """
+    )
     async def cast(self, ctx, spell_name, *, args=""):
         return await self._cast(ctx, None, spell_name, args)
 
